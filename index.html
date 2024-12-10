@@ -1,11 +1,22 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>Test</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>シナリオチャット</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<h1>テストページ</h1>
-<p>このページが正しく表示されればHTMLが正しく読み込まれています。</p>
+  <div class="chat-container">
+    <div class="chat-header">
+      <h1>シナリオチャット</h1>
+    </div>
+    <div id="chat-messages" class="chat-messages"></div>
+    <div class="input-area">
+      <input type="text" id="user-input" placeholder="メッセージを入力(任意)" />
+      <button id="send-btn">送信</button>
+    </div>
+  </div>
+  <script src="script.js"></script>
 </body>
 </html>
