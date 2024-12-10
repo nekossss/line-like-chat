@@ -7,15 +7,20 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="chat-container">
-    <div class="chat-header">
-      <h1>山野井 満</h1>
+  <div class="app-container">
+    <div class="sidebar">
+      <h2>登場人物</h2>
+      <ul id="speaker-list" class="speaker-list"></ul>
     </div>
-    <div id="chat-messages" class="chat-messages"></div>
-    <div class="input-area">
-      <!-- 必要に応じてユーザーの自由入力がある場合に使います -->
-      <input type="text" id="user-input" placeholder="メッセージを入力(任意)" />
-      <button id="send-btn">送信</button>
+    <div class="chat-container">
+      <div class="chat-header">
+        <h1 id="current-speaker">会話画面</h1>
+      </div>
+      <div id="chat-messages" class="chat-messages"></div>
+      <div class="input-area">
+        <input type="text" id="user-input" placeholder="メッセージを入力(任意)" />
+        <button id="send-btn">送信</button>
+      </div>
     </div>
   </div>
   <script src="script.js"></script>

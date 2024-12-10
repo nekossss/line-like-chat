@@ -1,31 +1,65 @@
 body {
   margin: 0;
   font-family: sans-serif;
+  background: #f0f0f0;
+}
+
+.app-container {
+  display: flex;
+  height: 100vh;
+}
+
+/* 左のサイドバー */
+.sidebar {
+  width: 200px;
+  background: #ffffff;
+  border-right: 1px solid #ccc;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar h2 {
+  margin: 0;
+  padding: 10px;
+  background: #f7f7f7;
+  border-bottom: 1px solid #ccc;
+}
+
+.speaker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.speaker-list li {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+
+.speaker-list li:hover {
   background: #e6e6e6;
 }
 
+/* 右側チャットエリア */
 .chat-container {
-  max-width: 400px;
-  margin: 0 auto;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100vh;
   background: #ffffff;
-  border: 1px solid #ccc;
 }
 
 .chat-header {
-  background: #f7f7f7;
+  background: #2e7d32;
+  color: #fff;
   padding: 10px;
-  display: flex;
-  align-items: center;
-  border-bottom: 1px solid #ccc;
 }
 
 .chat-header h1 {
   font-size: 16px;
   margin: 0;
-  color: #333;
 }
 
 .chat-messages {
@@ -46,14 +80,12 @@ body {
   font-size: 14px;
 }
 
-/* 山野井 満側のメッセージ(左寄せ) */
 .system-message {
   align-self: flex-start;
   background: #ffffff;
   border: 1px solid #ccc;
 }
 
-/* ユーザー側メッセージ(右寄せ) */
 .user-message {
   align-self: flex-end;
   background: #dcf8c6;
@@ -90,6 +122,7 @@ body {
   font-size: 14px;
 }
 
+/* 選択肢ボタン */
 .choices {
   display: flex;
   flex-direction: column;
