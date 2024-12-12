@@ -1,5 +1,5 @@
 // 後でスプレッドシートのURLをここに入れます
-const SPREADSHEET_URL = "ここにウェブ公開されたスプレッドシートのCSVまたはJSONのURL";
+const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOpH43k0f6Cc0Qn1gzXsnJNDybSce7CTW1hOWBgvTJIfTPuaZsEpcbO1u9E7CIQSSGzAHa4ZST7fFw/pub?output=csv";
 
 // データを格納するための変数
 let conversations = [];
