@@ -1,28 +1,24 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>シナリオチャット</title>
-<link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LINEっぽいチャット</title>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
-  <div class="app-container">
-    <div class="sidebar">
-      <h2>登場人物</h2>
-      <ul id="speaker-list" class="speaker-list"></ul>
-    </div>
-    <div class="chat-container">
-      <div class="chat-header">
-        <h1 id="current-speaker">会話画面</h1>
+  <div class="container">
+    <div class="sidebar">トーク一覧(仮)</div>
+    <div class="chat-area">
+      <div class="messages" id="messageContainer"></div>
+      <div class="input-area" id="inputArea">
+        <input type="text" id="userInput" placeholder="メッセージを入力..."/>
+        <button id="sendBtn">送信</button>
       </div>
-      <div id="chat-messages" class="chat-messages"></div>
-      <div class="input-area">
-        <input type="text" id="user-input" placeholder="メッセージを入力(任意)" />
-        <button id="send-btn">送信</button>
-      </div>
+      <div class="choices-area" id="choicesArea" style="display:none;"></div>
     </div>
   </div>
+  
   <script src="script.js"></script>
 </body>
 </html>

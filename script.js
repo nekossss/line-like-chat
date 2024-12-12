@@ -1,109 +1,87 @@
-const API_URL = "【GASのURL】";
-const encounteredSpeakers = new Set(); // これで初回登場チェック
+// 後でスプレッドシートのURLをここに入れます
+const SPREADSHEET_URL = "ここにウェブ公開されたスプレッドシートのCSVまたはJSONのURL";
 
-document.addEventListener("DOMContentLoaded", () => {
-  loadMessage("1");
-  
-  const sendBtn = document.getElementById("send-btn");
-  const userInput = document.getElementById("user-input");
-  
-  sendBtn.addEventListener("click", () => {
-    const text = userInput.value.trim();
-    if (text) {
-      addMessage(text, false);
-      userInput.value = "";
-    }
+// データを格納するための変数
+let conversations = [];
+
+// ページが読み込まれたらデータ取得
+window.addEventListener("load", () => {
+  fetchData().then(() => {
+    // データ取得後、最初のメッセージ表示
+    displayMessages(1);  // id=1からスタートする例
   });
 });
 
-async function loadMessage(currentId, choiceIndex) {
-  let url = `${API_URL}?currentId=${currentId}`;
-  if (choiceIndex !== undefined) {
-    url += `&choiceIndex=${choiceIndex}`;
-  }
+async function fetchData() {
+  // ここではCSVを想定。JSONでも方法はありますが、CSVの方が設定しやすい場合が多い
+  // Papaparseというライブラリを使うと便利ですが、ここでは簡略化します
+  const response = await fetch(SPREADSHEET_URL);
+  const text = await response.text();
 
-  const res = await fetch(url);
-  const data = await res.json();
+  // CSVを行ごとに分解
+  const rows = text.split("\n").map(r => r.split(","));
+  
+  // 1行目がヘッダーとして、
+  // 例： A列:id, B列:speaker, C列:message, D〜M:制御列 という前提で処理
+  // rows[0]はヘッダーなのでスキップして、rows[1]以降をデータ化
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    // 空行対策
+    if (row.length < 3) continue;
 
-  if (data.error) {
-    addMessage("エラーが発生しました: " + data.error, true);
-    return;
-  }
-
-  const isSystemMessage = data.speaker && data.speaker.trim() !== "";
-
-  if (data.speaker && data.speaker.trim() !== "") {
-    // 初登場スピーカーなら左リストに追加
-    if (!encounteredSpeakers.has(data.speaker)) {
-      encounteredSpeakers.add(data.speaker);
-      addSpeakerToList(data.speaker);
-    }
-
-    addSpeakerName(data.speaker);
-  }
-
-  addMessage(data.message, isSystemMessage);
-  clearChoices();
-
-  if (data.choices && data.choices.length > 0) {
-    showChoices(data.currentId, data.choices);
-  } else {
-    // 分岐なしの場合、自動で次IDへなどのロジック入れてもOK
-    // const nextId = parseInt(currentId, 10)+1;
-    // await new Promise(r => setTimeout(r, 500));
-    // loadMessage(nextId.toString());
-  }
-}
-
-function addMessage(text, isSystem) {
-  const chatMessages = document.getElementById("chat-messages");
-  const msgDiv = document.createElement("div");
-  msgDiv.classList.add("message");
-  msgDiv.classList.add(isSystem ? "system-message" : "user-message");
-  msgDiv.innerText = text;
-  chatMessages.appendChild(msgDiv);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-function addSpeakerName(name) {
-  // 発言者名を上に表示するならここで
-  const chatMessages = document.getElementById("chat-messages");
-  const speakerDiv = document.createElement("div");
-  speakerDiv.classList.add("speaker-name");
-  speakerDiv.innerText = name;
-  chatMessages.appendChild(speakerDiv);
-}
-
-function showChoices(currentId, choices) {
-  const chatMessages = document.getElementById("chat-messages");
-  const choicesDiv = document.createElement("div");
-  choicesDiv.classList.add("choices");
-
-  choices.forEach((choice, index) => {
-    const btn = document.createElement("button");
-    btn.classList.add("choice-btn");
-    btn.innerText = choice;
-    btn.addEventListener("click", () => {
-      addMessage(choice, false);
-      choicesDiv.remove();
-      loadMessage(currentId, index);
+    conversations.push({
+      id: parseInt(row[0], 10),
+      speaker: row[1],
+      message: row[2],
+      input: row[3] || "",
+      answer: row[4] || "",
+      TrueId: row[5] || "",
+      NGid: row[6] || "",
+      choice1: row[7] || "",
+      choice2: row[8] || "",
+      choice3: row[9] || "",
+      nextId1: row[10] || "",
+      nextId2: row[11] || "",
+      nextId3: row[12] || ""
     });
-    choicesDiv.appendChild(btn);
-  });
-
-  chatMessages.appendChild(choicesDiv);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
 }
 
-function clearChoices() {
-  const chatMessages = document.getElementById("chat-messages");
-  const existingChoices = chatMessages.querySelectorAll(".choices");
-  existingChoices.forEach(c => c.remove());
+function displayMessages(startId) {
+  const startIndex = conversations.findIndex(c => c.id === startId);
+  if (startIndex === -1) return;
+
+  const startRow = conversations[startIndex];
+  const currentSpeaker = startRow.speaker;
+
+  // 同一話者連続メッセージをまとめる
+  let combinedMessage = startRow.message;
+  let endIndex = startIndex;
+
+  for (let i = startIndex + 1; i < conversations.length; i++) {
+    const nextRow = conversations[i];
+    // D〜M列が空の判定（ここでは簡易的にすべて""であるかどうかチェック）
+    const controlEmpty = nextRow.input === "" && nextRow.answer === "" && 
+                         nextRow.TrueId === "" && nextRow.NGid === "" &&
+                         nextRow.choice1 === "" && nextRow.choice2 === "" && 
+                         nextRow.choice3 === "" && nextRow.nextId1 === "" &&
+                         nextRow.nextId2 === "" && nextRow.nextId3 === "";
+
+    if (nextRow.speaker === currentSpeaker && controlEmpty) {
+      combinedMessage += "\n" + nextRow.message;
+      endIndex = i;
+    } else {
+      break;
+    }
+  }
+
+  addMessageToChat(currentSpeaker, combinedMessage);
 }
 
-function addSpeakerToList(speakerName) {
-  const speakerList = document.getElementById("speaker-list");
-  const li = document.createElement("li");
-  li.innerText = speakerName;
-  speakerList.appendChild(li);
+function addMessageToChat(speaker, text) {
+  const container = document.getElementById("messageContainer");
+  const div = document.createElement("div");
+  div.className = "message-bubble";
+  div.textContent = speaker + ": " + text;
+  container.appendChild(div);
 }
