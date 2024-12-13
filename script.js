@@ -1,34 +1,32 @@
-// ***** 設定項目 *****
-// あなたのGoogleスプレッドシートをウェブに公開し、CSV形式のURLを取得してください
 const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOpH43k0f6Cc0Qn1gzXsnJNDybSce7CTW1hOWBgvTJIfTPuaZsEpcbO1u9E7CIQSSGzAHa4ZST7fFw/pub?output=csv";
 
-// 会話データを格納する配列
 let conversations = [];
+let speakerFirstAppearance = {}; // {speaker: startId}
+let displayedSpeakers = [];
+let currentSpeaker = null;
+let currentId = null;
 
-// 現在の会話位置を示すID
-let currentId = 1;
+const messageContainer = document.getElementById("messageContainer");
+const talkList = document.getElementById("talkList");
+const inputArea = document.getElementById("inputArea");
+const userInput = document.getElementById("userInput");
+const sendBtn = document.getElementById("sendBtn");
+const choicesArea = document.getElementById("choicesArea");
 
-// ページ読み込み時にデータ取得
 window.addEventListener("load", async () => {
-  const container = document.getElementById("messageContainer");
-  container.textContent = "データ取得中...";
+  messageContainer.textContent = "データ取得中...";
 
   try {
     const response = await fetch(SPREADSHEET_URL);
     const csvText = await response.text();
     const rows = csvText.split("\n").map(r => r.split(","));
 
-    // rows[0]はヘッダー想定：A列=id, B列=speaker, C列=message, D〜M列=制御列
-    // D〜M列は最大で10列（D,E,F,G,H,I,J,K,L,M）があるとして仮定(合計13列)
-    // 実際のスプレッドシート列数に合わせて修正すること
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
-      // 行が空または列数が足りない場合スキップ
       if (row.length < 3 || !row[0]) continue;
-
-      conversations.push({
+      let obj = {
         id: parseInt(row[0], 10),
-        speaker: row[1],
+        speaker: row[1].trim(),
         message: row[2],
         input: row[3] || "",
         answer: row[4] || "",
@@ -40,150 +38,199 @@ window.addEventListener("load", async () => {
         nextId1: row[10] || "",
         nextId2: row[11] || "",
         nextId3: row[12] || ""
-      });
+      };
+      conversations.push(obj);
     }
 
-    container.textContent = "";
-    // 最初のメッセージ表示
-    displayMessages(currentId);
+    messageContainer.textContent = "";
+
+    // 最初に出てきたspeakerを特定
+    const firstSpeakerLine = conversations.find(c => c.speaker !== "");
+    if (firstSpeakerLine) {
+      // 初登場スピーカーを記録
+      speakerFirstAppearance[firstSpeakerLine.speaker] = firstSpeakerLine.id;
+      addSpeakerToList(firstSpeakerLine.speaker, true);
+    }
 
   } catch (err) {
     console.error(err);
-    const container = document.getElementById("messageContainer");
-    container.textContent = "データ取得失敗。URLや公開設定を確認してください。";
+    messageContainer.textContent = "データ取得失敗。URLや公開設定を確認してください。";
   }
 });
 
-function displayMessages(startId) {
-  const startIndex = conversations.findIndex(c => c.id === startId);
-  if (startIndex === -1) {
-    console.warn("指定したIDの会話が見つかりません:", startId);
-    return;
+function addSpeakerToList(speaker, unread = true) {
+  if (displayedSpeakers.includes(speaker)) return;
+  displayedSpeakers.push(speaker);
+
+  const item = document.createElement("div");
+  item.className = "talk-item";
+
+  const nameDiv = document.createElement("div");
+  nameDiv.className = "talk-item-name";
+  nameDiv.textContent = speaker;
+  item.appendChild(nameDiv);
+
+  if (unread) {
+    const unreadIcon = document.createElement("div");
+    unreadIcon.className = "unread-icon";
+    item.appendChild(unreadIcon);
   }
 
-  const startRow = conversations[startIndex];
-  const currentSpeaker = startRow.speaker;
+  item.addEventListener("click", () => {
+    const icon = item.querySelector(".unread-icon");
+    if (icon) icon.remove();
+    startConversation(speaker);
+  });
 
-  // 同一話者連続メッセージをまとめる
-  let combinedMessage = startRow.message;
-  let endIndex = startIndex;
+  talkList.appendChild(item);
+}
 
-  for (let i = startIndex + 1; i < conversations.length; i++) {
-    const nextRow = conversations[i];
-    if (nextRow.speaker === currentSpeaker && isControlColumnsEmpty(nextRow)) {
-      // 同一speakerかつD〜M列が全て空なら連続メッセージとみなす
-      combinedMessage += "\n" + nextRow.message;
-      endIndex = i;
+async function startConversation(speaker) {
+  if (currentSpeaker === speaker) return;
+  currentSpeaker = speaker;
+  messageContainer.innerHTML = "";
+  inputArea.style.display = "none";
+  choicesArea.style.display = "none";
+  userInput.value = "";
+
+  const startId = speakerFirstAppearance[speaker];
+  if (!startId) return; // 万が一記録がない場合
+
+  currentId = startId;
+  await displayFromId(currentId);
+}
+
+async function displayFromId(startId) {
+  let index = conversations.findIndex(c => c.id === startId);
+  if (index === -1) return;
+
+  let currentRow = conversations[index];
+  let currentSp = currentRow.speaker;
+
+  while (true) {
+    if (!currentRow) break;
+
+    if (currentRow.speaker !== "" && currentRow.speaker === currentSp) {
+      // 同一スピーカーのメッセージ
+      addMessageToChat(currentRow.speaker, currentRow.message);
+      currentId = currentRow.id;
+      await sleep(1000);
+
+      let next = conversations.find(c => c.id === currentRow.id + 1);
+
+      if (!next) {
+        // もう次がない
+        break;
+      }
+
+      if (next.speaker === currentSp) {
+        // 同じspeaker続行
+        currentRow = next;
+      } else if (next.speaker === "") {
+        // ユーザーターン
+        await handleUserTurn(next);
+        break;
+      } else {
+        // 新しいspeaker登場
+        // 記録＆トーク一覧に追加（未読）、現在の会話ストップ
+        if (!speakerFirstAppearance[next.speaker]) {
+          speakerFirstAppearance[next.speaker] = next.id;
+          addSpeakerToList(next.speaker, true);
+        }
+        break;
+      }
+
+    } else if (currentRow.speaker === "") {
+      // ユーザー操作行
+      await handleUserTurn(currentRow);
+      break;
+
     } else {
+      // 現在のスピーカーと異なる別スピーカーがいきなり出た場合
+      // このケースは上で対処済みですが念のため
+      if (!speakerFirstAppearance[currentRow.speaker]) {
+        speakerFirstAppearance[currentRow.speaker] = currentRow.id;
+        addSpeakerToList(currentRow.speaker, true);
+      }
       break;
     }
   }
-
-  // メッセージ表示
-  addMessageToChat(currentSpeaker, combinedMessage);
-
-  // endIndex行の制御列を見て分岐
-  const finalRow = conversations[endIndex];
-  handleNextAction(finalRow);
 }
 
-function isControlColumnsEmpty(row) {
-  return (
-    row.input === "" &&
-    row.answer === "" &&
-    row.TrueId === "" &&
-    row.NGid === "" &&
-    row.choice1 === "" &&
-    row.choice2 === "" &&
-    row.choice3 === "" &&
-    row.nextId1 === "" &&
-    row.nextId2 === "" &&
-    row.nextId3 === ""
-  );
-}
+async function handleUserTurn(row) {
+  const {input, answer, TrueId, NGid, choice1, choice2, choice3, nextId1, nextId2, nextId3} = row;
 
-function addMessageToChat(speaker, text) {
-  const container = document.getElementById("messageContainer");
-  const div = document.createElement("div");
-  div.className = "message-bubble";
-  // 一旦シンプルに表示
-  div.textContent = speaker + ": " + text;
-  container.appendChild(div);
-
-  // 最下部へスクロール
-  container.scrollTop = container.scrollHeight;
-}
-
-function handleNextAction(row) {
-  const inputArea = document.getElementById("inputArea");
-  const choicesArea = document.getElementById("choicesArea");
-  const userInput = document.getElementById("userInput");
-  const sendBtn = document.getElementById("sendBtn");
-
-  // いったん全部非表示・無効化してから必要なものだけ表示
   inputArea.style.display = "none";
   choicesArea.style.display = "none";
 
-  // 自由入力判定
-  if (row.input && row.input === "自由入力") {
-    // 自由入力のUIを有効化
-    inputArea.style.display = "block";
-    sendBtn.onclick = () => {
-      const answer = userInput.value.trim();
-      if (answer === row.answer) {
-        // 正解
-        if (row.TrueId) {
-          currentId = parseInt(row.TrueId, 10);
-          userInput.value = "";
-          displayMessages(currentId);
-        }
-      } else {
-        // 不正解
-        if (row.NGid) {
-          currentId = parseInt(row.NGid, 10);
-          userInput.value = "";
-          displayMessages(currentId);
-        }
-      }
-    };
-    return;
-  }
-
-  // 選択肢判定（choice1,2,3があれば表示）
-  if (row.choice1 || row.choice2 || row.choice3) {
+  if (choice1 || choice2 || choice3) {
+    // 選択肢
     choicesArea.innerHTML = "";
     choicesArea.style.display = "block";
 
-    // 選択肢を配列化
     const choices = [];
-    if (row.choice1) choices.push({text: row.choice1, nextId: row.nextId1});
-    if (row.choice2) choices.push({text: row.choice2, nextId: row.nextId2});
-    if (row.choice3) choices.push({text: row.choice3, nextId: row.nextId3});
+    if (choice1) choices.push({text: choice1, nextId: nextId1});
+    if (choice2) choices.push({text: choice2, nextId: nextId2});
+    if (choice3) choices.push({text: choice3, nextId: nextId3});
 
-    choices.forEach(choice => {
-      const btn = document.createElement("button");
-      btn.textContent = choice.text;
-      btn.style.display = "block"; // 縦並び
-      btn.onclick = () => {
-        if (choice.nextId) {
-          currentId = parseInt(choice.nextId, 10);
-          displayMessages(currentId);
-        }
-      };
-      choicesArea.appendChild(btn);
+    await new Promise(resolve => {
+      choices.forEach(ch => {
+        const btn = document.createElement("button");
+        btn.textContent = ch.text;
+        btn.onclick = async () => {
+          addMessageToChat("あなた", ch.text);
+          choicesArea.style.display = "none";
+          await sleep(500);
+          if (ch.nextId) {
+            await displayFromId(parseInt(ch.nextId,10));
+          }
+          resolve();
+        };
+        choicesArea.appendChild(btn);
+      });
     });
 
-    return;
-  }
+  } else if (input && input.includes("自由入力")) {
+    // 自由入力
+    inputArea.style.display = "flex";
+    const originalOnclick = sendBtn.onclick;
+    sendBtn.onclick = async () => {
+      const userText = userInput.value.trim();
+      if (!userText) return;
+      addMessageToChat("あなた", userText);
+      userInput.value = "";
+      await sleep(500);
+      sendBtn.onclick = originalOnclick;
 
-  // ここまで来たら次へ進む指示がない場合は、次のIDへ進むか終了処理
-  // ここでは単純にID+1に進む例（実際はシナリオに応じて処理）
-  const nextIndex = conversations.findIndex(c => c.id === row.id + 1);
-  if (nextIndex !== -1) {
-    currentId = row.id + 1;
-    displayMessages(currentId);
+      if (userText === answer && TrueId) {
+        await displayFromId(parseInt(TrueId,10));
+      } else if (NGid) {
+        await displayFromId(parseInt(NGid,10));
+      } else {
+        // NGidなしか正解不正解分岐が成立しない場合は特に進行なし
+      }
+    };
+
   } else {
-    // 会話終了
-    addMessageToChat("システム", "会話が終了しました");
+    // 選択肢も自由入力もなし
+    // 何もせず終了
   }
+}
+
+function addMessageToChat(speaker, text) {
+  const rowDiv = document.createElement("div");
+  rowDiv.className = "message-row " + (speaker === "あなた" ? "message-right" : "message-left");
+
+  const bubbleDiv = document.createElement("div");
+  bubbleDiv.className = "message-bubble";
+  const safeText = text.replace(/\n/g, "<br>");
+  bubbleDiv.innerHTML = `<strong>${speaker}:</strong><br>${safeText}`;
+
+  rowDiv.appendChild(bubbleDiv);
+  messageContainer.appendChild(rowDiv);
+  messageContainer.scrollTop = messageContainer.scrollHeight;
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
