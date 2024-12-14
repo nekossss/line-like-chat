@@ -11,7 +11,7 @@ body {
 }
 
 .sidebar {
-  background: #e5ddd5; /* トーク一覧を元チャットエリア背景色に */
+  background: #e5ddd5; /* トーク一覧: #e5ddd5 */
   width: 200px;
   box-sizing: border-box;
   border-right: 1px solid #ccc;
@@ -48,7 +48,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #fff; /* チャットエリアを白背景に */
+  background: #fff; /* チャットエリア: #fff */
 }
 
 .messages {
@@ -107,17 +107,11 @@ body {
   max-width: 70%;
   padding: 10px;
   border-radius: 5px;
-  background: #e6e6e6;
+  background: #ffffff;
   word-wrap: break-word;
   display: block;
 }
 
 .message-right .message-bubble {
   background: #dcf8c6;
-}
-
-.message-bubble strong {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: bold;
 }

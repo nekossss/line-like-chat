@@ -1,8 +1,7 @@
-// あなたのスプレッドシート公開URLに差し替えてください
 const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOpH43k0f6Cc0Qn1gzXsnJNDybSce7CTW1hOWBgvTJIfTPuaZsEpcbO1u9E7CIQSSGzAHa4ZST7fFw/pub?output=csv";
 
 let conversations = [];
-let speakerFirstAppearance = {}; // {speaker: startId}
+let speakerFirstAppearance = {}; 
 let displayedSpeakers = [];
 let currentSpeaker = null;
 let currentId = null;
@@ -47,7 +46,6 @@ window.addEventListener("load", async () => {
 
     messageContainer.textContent = "";
 
-    // 最初に登場するspeakerを特定
     const firstSpeakerLine = conversations.find(c => c.speaker !== "");
     if (firstSpeakerLine) {
       speakerFirstAppearance[firstSpeakerLine.speaker] = firstSpeakerLine.id;
@@ -106,7 +104,6 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// 遅いスピード：メッセージ内容で時間変動
 function getDelayForMessage(msg) {
   const perCharTime = 200; 
   const randomMin = 1.0;
@@ -117,15 +114,13 @@ function getDelayForMessage(msg) {
   return Math.floor(base * factor);
 }
 
-// ドットアニメーション
-function showTypingIndicator(speaker = "") {
+function showTypingIndicator() {
   hideTypingIndicator();
   typingIndicatorDiv = document.createElement("div");
   typingIndicatorDiv.className = "message-row message-left";
   const bubble = document.createElement("div");
   bubble.className = "message-bubble";
-  bubble.innerHTML = `.`; // 初期は'.'からスタート
-  
+  bubble.innerHTML = `.`; 
   typingIndicatorDiv.appendChild(bubble);
   messageContainer.appendChild(typingIndicatorDiv);
   messageContainer.scrollTop = messageContainer.scrollHeight;
@@ -142,12 +137,10 @@ function showTypingIndicator(speaker = "") {
     }
     bubble.innerHTML = states[stateIndex];
 
-    // 2回（.->..->...を2回繰り返したら）ループ終了で'...'で固定
     if (cycleCount >= 2 && stateIndex === states.length - 1) {
       clearInterval(typingIndicatorInterval);
       typingIndicatorInterval = null;
     }
-
     messageContainer.scrollTop = messageContainer.scrollHeight;
   }, 500);
 }
@@ -164,8 +157,8 @@ function hideTypingIndicator() {
 }
 
 function getTypingWaitTime() {
-  const min = 2000; // 2秒
-  const max = 5000; // 5秒
+  const min = 2000; //2秒から5秒はそのまま
+  const max = 5000;
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
@@ -180,7 +173,7 @@ async function displayFromId(startId) {
     if (!currentRow) break;
 
     if (currentRow.speaker !== "" && currentRow.speaker === currentSp) {
-      // 相手メッセージ表示（名前表示なし）
+      // 相手メッセージ表示
       addMessageToChat(currentRow.speaker, currentRow.message);
       currentId = currentRow.id;
       
@@ -193,6 +186,11 @@ async function displayFromId(startId) {
       }
 
       if (next.speaker === currentSp) {
+        // speaker連続メッセージ：ここで0.7秒待ちに変更
+        await sleep(700);
+        showTypingIndicator();
+        await sleep(getTypingWaitTime());
+        hideTypingIndicator();
         currentRow = next;
       } else if (next.speaker === "") {
         await handleUserTurn(next);
@@ -206,12 +204,10 @@ async function displayFromId(startId) {
       }
 
     } else if (currentRow.speaker === "") {
-      // ユーザー操作
       await handleUserTurn(currentRow);
       break;
 
     } else {
-      // 新speaker登場
       if (!speakerFirstAppearance[currentRow.speaker]) {
         speakerFirstAppearance[currentRow.speaker] = currentRow.id;
         addSpeakerToList(currentRow.speaker, true);
@@ -244,10 +240,12 @@ async function handleUserTurn(row) {
         btn.onclick = async () => {
           addMessageToChat("あなた", ch.text);
           choicesArea.style.display = "none";
-          // 次のメッセージまでTyping Indicator表示
-          showTypingIndicator(currentSpeaker || "");
+          // ユーザー後は2秒待機
+          await sleep(2000);
+          showTypingIndicator();
           await sleep(getTypingWaitTime());
           hideTypingIndicator();
+
           if (ch.nextId) {
             await displayFromId(parseInt(ch.nextId,10));
           }
@@ -269,7 +267,9 @@ async function handleUserTurn(row) {
       await sleep(500);
       sendBtn.onclick = originalOnclick;
 
-      showTypingIndicator(currentSpeaker || "");
+      // ユーザーの場合は2秒待ってから...表示
+      await sleep(2000);
+      showTypingIndicator();
       await sleep(getTypingWaitTime());
       hideTypingIndicator();
 
@@ -295,7 +295,6 @@ function addMessageToChat(speaker, text) {
   bubbleDiv.className = "message-bubble";
   
   const safeText = text.replace(/\n/g, "<br>");
-  // 名前を表示しない（本文のみ）
   bubbleDiv.innerHTML = `${safeText}`;
 
   rowDiv.appendChild(bubbleDiv);
