@@ -104,8 +104,9 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// 2文字で0.2秒 → 1文字当たり0.1秒=100ms
 function getDelayForMessage(msg) {
-  const perCharTime = 200; 
+  const perCharTime = 100; 
   const randomMin = 1.0;
   const randomMax = 2.0;
   const length = msg.length;
@@ -157,7 +158,7 @@ function hideTypingIndicator() {
 }
 
 function getTypingWaitTime() {
-  const min = 2000; //2秒から5秒はそのまま
+  const min = 2000; 
   const max = 5000;
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -186,8 +187,7 @@ async function displayFromId(startId) {
       }
 
       if (next.speaker === currentSp) {
-        // speaker連続メッセージ：ここで0.7秒待ちに変更
-        await sleep(700);
+        // 連続メッセージ時は即...を出す（0.7秒待ちなし）
         showTypingIndicator();
         await sleep(getTypingWaitTime());
         hideTypingIndicator();
@@ -267,7 +267,7 @@ async function handleUserTurn(row) {
       await sleep(500);
       sendBtn.onclick = originalOnclick;
 
-      // ユーザーの場合は2秒待ってから...表示
+      // ユーザー後は2秒待機
       await sleep(2000);
       showTypingIndicator();
       await sleep(getTypingWaitTime());
@@ -277,8 +277,6 @@ async function handleUserTurn(row) {
         await displayFromId(parseInt(TrueId,10));
       } else if (NGid) {
         await displayFromId(parseInt(NGid,10));
-      } else {
-        // NGidなし
       }
     };
 
