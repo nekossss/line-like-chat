@@ -104,11 +104,12 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// 2文字で0.1秒 → 1文字50ms
+// 2文字で0.2秒 → 1文字=0.1秒=100msだったが、少し遅く0.075秒=75msに
+// ここを75msに変更
 function getDelayForMessage(msg) {
-  const perCharTime = 50; // 1文字0.05秒
+  const perCharTime = 75; // 1文字75ms
   const randomMin = 1.0;
-  const randomMax = 1.5; // 前より狭める
+  const randomMax = 1.6; // 前回1.5→1.6で気持ち遅く
   const length = msg.length;
   const base = length * perCharTime;
   const factor = Math.random() * (randomMax - randomMin) + randomMin;
@@ -157,9 +158,11 @@ function hideTypingIndicator() {
   }
 }
 
+// タイピング待機時間を少し長く
+// 前回1〜2秒 → 今回1.2〜2.5秒に
 function getTypingWaitTime() {
-  const min = 1000; // 1〜2秒でさらに短縮
-  const max = 2000;
+  const min = 1200; //1.2秒
+  const max = 2500; //2.5秒
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
@@ -187,7 +190,7 @@ async function displayFromId(startId) {
       }
 
       if (next.speaker === currentSp) {
-        // 連続メッセージ: 即...表示
+        // 連続メッセージ時は即...
         showTypingIndicator();
         await sleep(getTypingWaitTime());
         hideTypingIndicator();
@@ -224,7 +227,6 @@ async function handleUserTurn(row) {
   choicesArea.style.display = "none";
 
   if (choice1 || choice2 || choice3) {
-    // 選択肢
     choicesArea.innerHTML = "";
     choicesArea.style.display = "block";
 
@@ -240,8 +242,8 @@ async function handleUserTurn(row) {
         btn.onclick = async () => {
           addMessageToChat("あなた", ch.text);
           choicesArea.style.display = "none";
-          // ユーザー後は1秒待機(前は2秒だったが全体的に速く)
-          await sleep(1000);
+          // ユーザー後は1.5秒待ち
+          await sleep(1500);
           showTypingIndicator();
           await sleep(getTypingWaitTime());
           hideTypingIndicator();
@@ -256,7 +258,6 @@ async function handleUserTurn(row) {
     });
 
   } else if (input && input.includes("自由入力")) {
-    // 自由入力
     inputArea.style.display = "flex";
     const originalOnclick = sendBtn.onclick;
     sendBtn.onclick = async () => {
@@ -267,8 +268,8 @@ async function handleUserTurn(row) {
       await sleep(500);
       sendBtn.onclick = originalOnclick;
 
-      // ユーザー後は1秒待機に短縮
-      await sleep(1000);
+      // ユーザー後は1.5秒待ち
+      await sleep(1500);
       showTypingIndicator();
       await sleep(getTypingWaitTime());
       hideTypingIndicator();
