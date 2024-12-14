@@ -11,7 +11,7 @@ body {
 }
 
 .sidebar {
-  background: #fff;
+  background: #e5ddd5; /* トーク一覧を元チャットエリア背景色に */
   width: 200px;
   box-sizing: border-box;
   border-right: 1px solid #ccc;
@@ -48,7 +48,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #e5ddd5;
+  background: #fff; /* チャットエリアを白背景に */
 }
 
 .messages {
@@ -107,7 +107,7 @@ body {
   max-width: 70%;
   padding: 10px;
   border-radius: 5px;
-  background: #ffffff;
+  background: #e6e6e6;
   word-wrap: break-word;
   display: block;
 }

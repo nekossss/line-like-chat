@@ -1,3 +1,4 @@
+// あなたのスプレッドシート公開URLに差し替えてください
 const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOpH43k0f6Cc0Qn1gzXsnJNDybSce7CTW1hOWBgvTJIfTPuaZsEpcbO1u9E7CIQSSGzAHa4ZST7fFw/pub?output=csv";
 
 let conversations = [];
@@ -5,6 +6,8 @@ let speakerFirstAppearance = {}; // {speaker: startId}
 let displayedSpeakers = [];
 let currentSpeaker = null;
 let currentId = null;
+let typingIndicatorDiv = null;
+let typingIndicatorInterval = null;
 
 const messageContainer = document.getElementById("messageContainer");
 const talkList = document.getElementById("talkList");
@@ -44,10 +47,9 @@ window.addEventListener("load", async () => {
 
     messageContainer.textContent = "";
 
-    // 最初に出てきたspeakerを特定
+    // 最初に登場するspeakerを特定
     const firstSpeakerLine = conversations.find(c => c.speaker !== "");
     if (firstSpeakerLine) {
-      // 初登場スピーカーを記録
       speakerFirstAppearance[firstSpeakerLine.speaker] = firstSpeakerLine.id;
       addSpeakerToList(firstSpeakerLine.speaker, true);
     }
@@ -94,7 +96,7 @@ async function startConversation(speaker) {
   userInput.value = "";
 
   const startId = speakerFirstAppearance[speaker];
-  if (!startId) return; // 記録がない場合は何もしない
+  if (!startId) return;
 
   currentId = startId;
   await displayFromId(currentId);
@@ -104,10 +106,66 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ランダムな待機時間(0.8～2秒くらい)を返す
-function getRandomDelay() {
-  const min = 800;  // 0.8秒
-  const max = 2000; // 2秒
+// 遅いスピード：メッセージ内容で時間変動
+function getDelayForMessage(msg) {
+  const perCharTime = 200; 
+  const randomMin = 1.0;
+  const randomMax = 2.0;
+  const length = msg.length;
+  const base = length * perCharTime;
+  const factor = Math.random() * (randomMax - randomMin) + randomMin;
+  return Math.floor(base * factor);
+}
+
+// ドットアニメーション
+function showTypingIndicator(speaker = "") {
+  hideTypingIndicator();
+  typingIndicatorDiv = document.createElement("div");
+  typingIndicatorDiv.className = "message-row message-left";
+  const bubble = document.createElement("div");
+  bubble.className = "message-bubble";
+  bubble.innerHTML = `.`; // 初期は'.'からスタート
+  
+  typingIndicatorDiv.appendChild(bubble);
+  messageContainer.appendChild(typingIndicatorDiv);
+  messageContainer.scrollTop = messageContainer.scrollHeight;
+
+  let states = [".","..","..."];
+  let cycleCount = 0;
+  let stateIndex = 0;
+
+  typingIndicatorInterval = setInterval(() => {
+    stateIndex++;
+    if (stateIndex >= states.length) {
+      stateIndex = 0;
+      cycleCount++;
+    }
+    bubble.innerHTML = states[stateIndex];
+
+    // 2回（.->..->...を2回繰り返したら）ループ終了で'...'で固定
+    if (cycleCount >= 2 && stateIndex === states.length - 1) {
+      clearInterval(typingIndicatorInterval);
+      typingIndicatorInterval = null;
+    }
+
+    messageContainer.scrollTop = messageContainer.scrollHeight;
+  }, 500);
+}
+
+function hideTypingIndicator() {
+  if (typingIndicatorInterval) {
+    clearInterval(typingIndicatorInterval);
+    typingIndicatorInterval = null;
+  }
+  if (typingIndicatorDiv && typingIndicatorDiv.parentNode) {
+    typingIndicatorDiv.parentNode.removeChild(typingIndicatorDiv);
+    typingIndicatorDiv = null;
+  }
+}
+
+function getTypingWaitTime() {
+  const min = 2000; // 2秒
+  const max = 5000; // 5秒
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
@@ -122,27 +180,24 @@ async function displayFromId(startId) {
     if (!currentRow) break;
 
     if (currentRow.speaker !== "" && currentRow.speaker === currentSp) {
-      // 同一スピーカーのメッセージ表示
+      // 相手メッセージ表示（名前表示なし）
       addMessageToChat(currentRow.speaker, currentRow.message);
       currentId = currentRow.id;
-      await sleep(getRandomDelay());
+      
+      await sleep(getDelayForMessage(currentRow.message));
 
       let next = conversations.find(c => c.id === currentRow.id + 1);
 
       if (!next) {
-        // 次がない
         break;
       }
 
       if (next.speaker === currentSp) {
-        // 同じspeaker続行
         currentRow = next;
       } else if (next.speaker === "") {
-        // ユーザーターン
         await handleUserTurn(next);
         break;
       } else {
-        // 新しいspeaker登場
         if (!speakerFirstAppearance[next.speaker]) {
           speakerFirstAppearance[next.speaker] = next.id;
           addSpeakerToList(next.speaker, true);
@@ -151,12 +206,12 @@ async function displayFromId(startId) {
       }
 
     } else if (currentRow.speaker === "") {
-      // ユーザー操作行
+      // ユーザー操作
       await handleUserTurn(currentRow);
       break;
 
     } else {
-      // 別speakerの突然登場時(保険)
+      // 新speaker登場
       if (!speakerFirstAppearance[currentRow.speaker]) {
         speakerFirstAppearance[currentRow.speaker] = currentRow.id;
         addSpeakerToList(currentRow.speaker, true);
@@ -189,7 +244,10 @@ async function handleUserTurn(row) {
         btn.onclick = async () => {
           addMessageToChat("あなた", ch.text);
           choicesArea.style.display = "none";
-          await sleep(500);
+          // 次のメッセージまでTyping Indicator表示
+          showTypingIndicator(currentSpeaker || "");
+          await sleep(getTypingWaitTime());
+          hideTypingIndicator();
           if (ch.nextId) {
             await displayFromId(parseInt(ch.nextId,10));
           }
@@ -211,17 +269,21 @@ async function handleUserTurn(row) {
       await sleep(500);
       sendBtn.onclick = originalOnclick;
 
+      showTypingIndicator(currentSpeaker || "");
+      await sleep(getTypingWaitTime());
+      hideTypingIndicator();
+
       if (userText === answer && TrueId) {
         await displayFromId(parseInt(TrueId,10));
       } else if (NGid) {
         await displayFromId(parseInt(NGid,10));
       } else {
-        // NGidなしか不正解時に特に分岐なしの場合は何もなし
+        // NGidなし
       }
     };
 
   } else {
-    // 選択肢も自由入力もなしの場合、特に操作なし
+    // 選択肢も自由入力もなし
   }
 }
 
@@ -231,8 +293,10 @@ function addMessageToChat(speaker, text) {
 
   const bubbleDiv = document.createElement("div");
   bubbleDiv.className = "message-bubble";
+  
   const safeText = text.replace(/\n/g, "<br>");
-  bubbleDiv.innerHTML = `<strong>${speaker}:</strong><br>${safeText}`;
+  // 名前を表示しない（本文のみ）
+  bubbleDiv.innerHTML = `${safeText}`;
 
   rowDiv.appendChild(bubbleDiv);
   messageContainer.appendChild(rowDiv);
