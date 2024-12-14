@@ -94,10 +94,21 @@ async function startConversation(speaker) {
   userInput.value = "";
 
   const startId = speakerFirstAppearance[speaker];
-  if (!startId) return; // 万が一記録がない場合
+  if (!startId) return; // 記録がない場合は何もしない
 
   currentId = startId;
   await displayFromId(currentId);
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ランダムな待機時間(0.8～2秒くらい)を返す
+function getRandomDelay() {
+  const min = 800;  // 0.8秒
+  const max = 2000; // 2秒
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 async function displayFromId(startId) {
@@ -111,15 +122,15 @@ async function displayFromId(startId) {
     if (!currentRow) break;
 
     if (currentRow.speaker !== "" && currentRow.speaker === currentSp) {
-      // 同一スピーカーのメッセージ
+      // 同一スピーカーのメッセージ表示
       addMessageToChat(currentRow.speaker, currentRow.message);
       currentId = currentRow.id;
-      await sleep(1000);
+      await sleep(getRandomDelay());
 
       let next = conversations.find(c => c.id === currentRow.id + 1);
 
       if (!next) {
-        // もう次がない
+        // 次がない
         break;
       }
 
@@ -132,7 +143,6 @@ async function displayFromId(startId) {
         break;
       } else {
         // 新しいspeaker登場
-        // 記録＆トーク一覧に追加（未読）、現在の会話ストップ
         if (!speakerFirstAppearance[next.speaker]) {
           speakerFirstAppearance[next.speaker] = next.id;
           addSpeakerToList(next.speaker, true);
@@ -146,8 +156,7 @@ async function displayFromId(startId) {
       break;
 
     } else {
-      // 現在のスピーカーと異なる別スピーカーがいきなり出た場合
-      // このケースは上で対処済みですが念のため
+      // 別speakerの突然登場時(保険)
       if (!speakerFirstAppearance[currentRow.speaker]) {
         speakerFirstAppearance[currentRow.speaker] = currentRow.id;
         addSpeakerToList(currentRow.speaker, true);
@@ -207,13 +216,12 @@ async function handleUserTurn(row) {
       } else if (NGid) {
         await displayFromId(parseInt(NGid,10));
       } else {
-        // NGidなしか正解不正解分岐が成立しない場合は特に進行なし
+        // NGidなしか不正解時に特に分岐なしの場合は何もなし
       }
     };
 
   } else {
-    // 選択肢も自由入力もなし
-    // 何もせず終了
+    // 選択肢も自由入力もなしの場合、特に操作なし
   }
 }
 
@@ -229,8 +237,4 @@ function addMessageToChat(speaker, text) {
   rowDiv.appendChild(bubbleDiv);
   messageContainer.appendChild(rowDiv);
   messageContainer.scrollTop = messageContainer.scrollHeight;
-}
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
