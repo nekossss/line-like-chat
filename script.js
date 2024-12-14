@@ -104,11 +104,11 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// 2文字で0.2秒 → 1文字当たり0.1秒=100ms
+// 2文字で0.1秒 → 1文字50ms
 function getDelayForMessage(msg) {
-  const perCharTime = 100; 
+  const perCharTime = 50; // 1文字0.05秒
   const randomMin = 1.0;
-  const randomMax = 2.0;
+  const randomMax = 1.5; // 前より狭める
   const length = msg.length;
   const base = length * perCharTime;
   const factor = Math.random() * (randomMax - randomMin) + randomMin;
@@ -158,8 +158,8 @@ function hideTypingIndicator() {
 }
 
 function getTypingWaitTime() {
-  const min = 2000; 
-  const max = 5000;
+  const min = 1000; // 1〜2秒でさらに短縮
+  const max = 2000;
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
@@ -187,7 +187,7 @@ async function displayFromId(startId) {
       }
 
       if (next.speaker === currentSp) {
-        // 連続メッセージ時は即...を出す（0.7秒待ちなし）
+        // 連続メッセージ: 即...表示
         showTypingIndicator();
         await sleep(getTypingWaitTime());
         hideTypingIndicator();
@@ -240,8 +240,8 @@ async function handleUserTurn(row) {
         btn.onclick = async () => {
           addMessageToChat("あなた", ch.text);
           choicesArea.style.display = "none";
-          // ユーザー後は2秒待機
-          await sleep(2000);
+          // ユーザー後は1秒待機(前は2秒だったが全体的に速く)
+          await sleep(1000);
           showTypingIndicator();
           await sleep(getTypingWaitTime());
           hideTypingIndicator();
@@ -267,8 +267,8 @@ async function handleUserTurn(row) {
       await sleep(500);
       sendBtn.onclick = originalOnclick;
 
-      // ユーザー後は2秒待機
-      await sleep(2000);
+      // ユーザー後は1秒待機に短縮
+      await sleep(1000);
       showTypingIndicator();
       await sleep(getTypingWaitTime());
       hideTypingIndicator();
