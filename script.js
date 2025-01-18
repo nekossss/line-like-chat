@@ -2,7 +2,7 @@
    1) グローバル変数・定義
 ========================================= */
 
-// CSVの公開URL
+// CSVの公開URL（必要なら書き換えてください）
 const SPREADSHEET_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOpH43k0f6Cc0Qn1gzXsnJNDybSce7CTW1hOWBgvTJIfTPuaZsEpcbO1u9E7CIQSSGzAHa4ZST7fFw/pub?output=csv";
 
@@ -54,16 +54,17 @@ window.addEventListener("load", async () => {
       const row = rows[i];
       console.log(`[DEBUG] Row #${i}`, row, " length=", row.length);
 
-      // 20列以上あるかチェック (S=18, T=19)
-      if (row.length < 20) {
-        console.log("[DEBUG] row.length < 20 → スキップ:", row);
+      // 28列以上あるかチェック (最低でも AB列=27 が必要と想定)
+      // 今回は U=20, V=21, ... まで読み込むため
+      if (row.length < 28) {
+        console.log("[DEBUG] row.length < 28 → スキップ:", row);
         continue;
       }
       
       const id = parseInt(row[0], 10);
       if (!id) continue;
 
-      // B列(1), C列(2) ... のデータ取り出しは既存通り
+      // A=0, B=1, C=2, ... のカラムに対応
       const speakerName      = (row[1]  || "").trim();
       const message          = (row[2]  || "").trim();
       const input            = (row[3]  || "").trim();
@@ -82,13 +83,21 @@ window.addEventListener("load", async () => {
       const waittime_seconds = (row[16] || "").trim();
       const readstatus       = (row[17] || "").trim();
 
-      // --- 変更点: S列/T列を読み取る際に \r を除去 ---
+      // S列/T列 (image, imageURL)
       const imageRaw = (row[18] || "");
       const imageURLRaw = (row[19] || "");
-
-      // \r(キャリッジリターン)を除去してtrim
       const image = imageRaw.replace(/\r/g, "").trim();
       let imageURL = imageURLRaw.replace(/\r/g, "").trim();
+
+      // ▼▼ U列=choice1URL (row[20]) / V列=Tweettext1 (row[21]) など ▼▼
+      const choice1URL = (row[20] || "").trim();   // U列
+      const Tweettext1 = (row[21] || "").trim();   // V列
+      const choice2URL = (row[22] || "").trim();   // W列
+      const Tweettext2 = (row[23] || "").trim();   // X列
+      const choice3URL = (row[24] || "").trim();   // Y列
+      const Tweettext3 = (row[25] || "").trim();   // Z列
+      const choice4URL = (row[26] || "").trim();   // AA列
+      const Tweettext4 = (row[27] || "").trim();   // AB列
 
       // [DEBUG] 確認ログ
       console.log(`[DEBUG] i=${i} image=${image}, imageURL=${imageURL}`);
@@ -113,7 +122,17 @@ window.addEventListener("load", async () => {
         waittime_seconds,
         readstatus,
         image,
-        imageURL
+        imageURL,
+
+        // ここで読み込んだけど、URLは使わない
+        choice1URL,
+        Tweettext1,
+        choice2URL,
+        Tweettext2,
+        choice3URL,
+        Tweettext3,
+        choice4URL,
+        Tweettext4
       });
     }
 
@@ -275,7 +294,6 @@ async function displayFromId(startId) {
     const rowSpeakerName = currentRow.speakerName;
     const nextRow = conversations.find(c => c.id === currentRow.id + 1);
 
-    // [DEBUG] ここで currentRow を確認
     console.log("[DEBUG] displayFromId - currentRow:", currentRow);
 
     // A) 同じスピーカーID & "USER"でない
@@ -283,8 +301,6 @@ async function displayFromId(startId) {
       showTypingIndicator();
       await sleep(getTypingWaitTime());
       hideTypingIndicator();
-
-      console.log("[DEBUG] addMessageToChat with image=", currentRow.image, " imageURL=", currentRow.imageURL);
 
       addMessageToChat(
         rowSpeakerId,
@@ -308,8 +324,6 @@ async function displayFromId(startId) {
         showTypingIndicator();
         await sleep(getTypingWaitTime());
         hideTypingIndicator();
-
-        console.log("[DEBUG] addMessageToChat (USER) image=", currentRow.image, " imageURL=", currentRow.imageURL);
 
         addMessageToChat(
           "USER",
@@ -355,7 +369,7 @@ async function displayFromId(startId) {
 }
 
 /* =========================================
-   7) ユーザー操作
+   7) ユーザー操作 (選択肢/自由入力)
 ========================================= */
 async function handleUserTurn(row) {
   const {
@@ -364,7 +378,17 @@ async function handleUserTurn(row) {
     TrueId,
     NGid,
     choice1, choice2, choice3, choice4,
-    nextId1, nextId2, nextId3, nextId4
+    nextId1, nextId2, nextId3, nextId4,
+
+    // ここで受け取るが URLは使わない
+    choice1URL,
+    Tweettext1,
+    choice2URL,
+    Tweettext2,
+    choice3URL,
+    Tweettext3,
+    choice4URL,
+    Tweettext4
   } = row;
 
   inputArea.style.display = "none";
@@ -375,21 +399,48 @@ async function handleUserTurn(row) {
     choicesArea.innerHTML = "";
     choicesArea.style.display = "block";
 
+    // ▼▼ 選択肢リストを作成。URLは今回使わず、テキストだけツイート ▼▼
     const choices = [];
-    if (choice1) choices.push({ text: choice1, nextId: nextId1 });
-    if (choice2) choices.push({ text: choice2, nextId: nextId2 });
-    if (choice3) choices.push({ text: choice3, nextId: nextId3 });
-    if (choice4) choices.push({ text: choice4, nextId: nextId4 });
+    if (choice1) {
+      choices.push({
+        text: choice1,
+        nextId: nextId1,
+        tweetText: Tweettext1 // V列の本文
+      });
+    }
+    if (choice2) {
+      choices.push({
+        text: choice2,
+        nextId: nextId2,
+        tweetText: Tweettext2 // X列の本文
+      });
+    }
+    if (choice3) {
+      choices.push({
+        text: choice3,
+        nextId: nextId3,
+        tweetText: Tweettext3
+      });
+    }
+    if (choice4) {
+      choices.push({
+        text: choice4,
+        nextId: nextId4,
+        tweetText: Tweettext4
+      });
+    }
 
     await new Promise((resolve) => {
       choices.forEach(ch => {
         const btn = document.createElement("button");
         btn.textContent = ch.text;
+
         btn.onclick = async () => {
           showTypingIndicator();
           await sleep(getTypingWaitTime());
           hideTypingIndicator();
 
+          // ユーザーの発話としてチャット欄に表示
           addMessageToChat("USER", "あなた", ch.text);
           choicesArea.style.display = "none";
 
@@ -398,6 +449,18 @@ async function handleUserTurn(row) {
           await sleep(getTypingWaitTime());
           hideTypingIndicator();
 
+          // ▼▼ ツイート画面を (本文だけ) で開く ▼▼
+          // URLはつけない ( &url=... は不要 )
+          if (ch.tweetText) {
+            const tweetBase = "https://twitter.com/intent/tweet";
+            const fullURL =
+              tweetBase +
+              "?text=" + encodeURIComponent(ch.tweetText);
+
+            window.open(fullURL, "_blank", "noopener");
+          }
+
+          // ▼▼ もし nextId があれば次の会話へ進める ▼▼
           if (ch.nextId) {
             speakerConversations[currentSpeakerId].currentId = parseInt(ch.nextId, 10);
             await displayFromId(parseInt(ch.nextId, 10));
@@ -407,6 +470,7 @@ async function handleUserTurn(row) {
         choicesArea.appendChild(btn);
       });
     });
+
   } else if (input === "自由入力") {
     inputArea.style.display = "flex";
     const originalOnclick = sendBtn.onclick;
