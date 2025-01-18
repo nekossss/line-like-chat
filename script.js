@@ -12,13 +12,7 @@ let conversations = [];
 // 現在選択中の speaker_id
 let currentSpeakerId = null;
 
-/*
-  例: speakerConversations["SP001"] = {
-    speakerName: "山野井 満",
-    messages: [ { speakerName:"山野井 満", text:"..." }, ... ],
-    currentId: 77
-  }
-*/
+// 各スピーカーの会話履歴
 let speakerConversations = {};
 
 // サイドバーに表示中の speaker_id
@@ -35,6 +29,9 @@ const inputArea = document.getElementById("inputArea");
 const userInput = document.getElementById("userInput");
 const sendBtn = document.getElementById("sendBtn");
 const choicesArea = document.getElementById("choicesArea");
+
+// 追加: 会話の二重実行を防ぐフラグ
+let isConversationRunning = false;
 
 /* =========================================
    2) ページロード時: CSVを取得
@@ -55,7 +52,6 @@ window.addEventListener("load", async () => {
       console.log(`[DEBUG] Row #${i}`, row, " length=", row.length);
 
       // 28列以上あるかチェック (最低でも AB列=27 が必要と想定)
-      // 今回は U=20, V=21, ... まで読み込むため
       if (row.length < 28) {
         console.log("[DEBUG] row.length < 28 → スキップ:", row);
         continue;
@@ -89,7 +85,7 @@ window.addEventListener("load", async () => {
       const image = imageRaw.replace(/\r/g, "").trim();
       let imageURL = imageURLRaw.replace(/\r/g, "").trim();
 
-      // ▼▼ U列=choice1URL (row[20]) / V列=Tweettext1 (row[21]) など ▼▼
+      // U列～AB列
       const choice1URL = (row[20] || "").trim();   // U列
       const Tweettext1 = (row[21] || "").trim();   // V列
       const choice2URL = (row[22] || "").trim();   // W列
@@ -216,7 +212,14 @@ function addSpeakerToList(speakerId, speakerName, unread = false) {
    4) 会話開始
 ========================================= */
 async function startConversation(speakerId) {
-  if (currentSpeakerId === speakerId) return;
+  // すでに同じスピーカーで会話実行中なら何もしない
+  if (currentSpeakerId === speakerId && isConversationRunning) {
+    return;
+  }
+
+  // 会話フロー開始
+  isConversationRunning = true;
+
   currentSpeakerId = speakerId;
 
   // 画面クリア
@@ -236,9 +239,16 @@ async function startConversation(speakerId) {
 
   restoreConversationHistory(speakerId);
 
-  if (!speakerConversations[speakerId].currentId) return;
+  if (!speakerConversations[speakerId].currentId) {
+    // 会話フロー終了
+    isConversationRunning = false;
+    return;
+  }
 
   await displayFromId(speakerConversations[speakerId].currentId);
+
+  // 会話フロー終了
+  isConversationRunning = false;
 }
 
 /* =========================================
@@ -281,6 +291,7 @@ async function displayFromId(startId) {
 
   while (true) {
     if (!currentRow) break;
+    // もし途中でスピーカーが切り替わったら停止
     if (currentSpeakerId !== initialSpeakerId) break;
 
     const waitSec = parseInt(currentRow.waittime_seconds || "0", 10);
@@ -380,8 +391,7 @@ async function handleUserTurn(row) {
     choice1, choice2, choice3, choice4,
     nextId1, nextId2, nextId3, nextId4,
 
-    // ここで受け取るが URLは使わない
-    choice1URL,
+    choice1URL,  // 使わない
     Tweettext1,
     choice2URL,
     Tweettext2,
@@ -391,100 +401,103 @@ async function handleUserTurn(row) {
     Tweettext4
   } = row;
 
+  // 表示リセット
   inputArea.style.display = "none";
   choicesArea.style.display = "none";
   userInput.value = "";
 
+  // (A) 選択肢がある場合
   if (choice1 || choice2 || choice3 || choice4) {
     choicesArea.innerHTML = "";
     choicesArea.style.display = "block";
 
-    // ▼▼ 選択肢リストを作成。URLは今回使わず、テキストだけツイート ▼▼
     const choices = [];
     if (choice1) {
-      choices.push({
-        text: choice1,
-        nextId: nextId1,
-        tweetText: Tweettext1 // V列の本文
-      });
+      choices.push({ text: choice1, nextId: nextId1, tweetText: Tweettext1 });
     }
     if (choice2) {
-      choices.push({
-        text: choice2,
-        nextId: nextId2,
-        tweetText: Tweettext2 // X列の本文
-      });
+      choices.push({ text: choice2, nextId: nextId2, tweetText: Tweettext2 });
     }
     if (choice3) {
-      choices.push({
-        text: choice3,
-        nextId: nextId3,
-        tweetText: Tweettext3
-      });
+      choices.push({ text: choice3, nextId: nextId3, tweetText: Tweettext3 });
     }
     if (choice4) {
-      choices.push({
-        text: choice4,
-        nextId: nextId4,
-        tweetText: Tweettext4
-      });
+      choices.push({ text: choice4, nextId: nextId4, tweetText: Tweettext4 });
     }
 
     await new Promise((resolve) => {
-      choices.forEach(ch => {
+      choices.forEach((ch) => {
         const btn = document.createElement("button");
         btn.textContent = ch.text;
 
         btn.onclick = async () => {
+          // 二重押下防止
+          if (btn.disabled) return;
+          btn.disabled = true;
+
+          // 他の選択肢ボタンも無効化
+          const otherButtons = choicesArea.querySelectorAll("button");
+          otherButtons.forEach((b) => (b.disabled = true));
+
           showTypingIndicator();
           await sleep(getTypingWaitTime());
           hideTypingIndicator();
 
-          // ユーザーの発話としてチャット欄に表示
+          // ユーザー発話をチャット欄に追加
           addMessageToChat("USER", "あなた", ch.text);
+
+          // 選択肢コンテナ非表示
           choicesArea.style.display = "none";
 
-          await sleep(500);
-          showTypingIndicator();
-          await sleep(getTypingWaitTime());
-          hideTypingIndicator();
-
-          // ▼▼ ツイート画面を (本文だけ) で開く ▼▼
-          // URLはつけない ( &url=... は不要 )
+          // ツイート処理 (画面遷移)
           if (ch.tweetText) {
             const tweetBase = "https://twitter.com/intent/tweet";
-            const fullURL =
-              tweetBase +
-              "?text=" + encodeURIComponent(ch.tweetText);
-
+            const fullURL = tweetBase + "?text=" + encodeURIComponent(ch.tweetText);
             window.open(fullURL, "_blank", "noopener");
           }
 
-          // ▼▼ もし nextId があれば次の会話へ進める ▼▼
+          // 会話ID遷移
           if (ch.nextId) {
             speakerConversations[currentSpeakerId].currentId = parseInt(ch.nextId, 10);
             await displayFromId(parseInt(ch.nextId, 10));
           }
+
           resolve();
         };
+
         choicesArea.appendChild(btn);
       });
     });
 
-  } else if (input === "自由入力") {
+  }
+  // (B) 自由入力の場合
+  else if (input === "自由入力") {
     inputArea.style.display = "flex";
+
+    // 現在の onclick ハンドラを退避
     const originalOnclick = sendBtn.onclick;
 
+    // 新たな onclick を設定
     sendBtn.onclick = async () => {
+      // 二重押下防止
+      if (sendBtn.disabled) return;
+      sendBtn.disabled = true;
+
       const userText = userInput.value.trim();
-      if (!userText) return;
+      if (!userText) {
+        sendBtn.disabled = false; // 再度入力できるように
+        return;
+      }
 
       showTypingIndicator();
       await sleep(getTypingWaitTime());
       hideTypingIndicator();
 
+      // ユーザーの発話をチャット欄に表示
       addMessageToChat("USER", "あなた", userText);
       userInput.value = "";
+
+      // 一旦押下無効
       sendBtn.onclick = originalOnclick;
 
       await sleep(500);
@@ -492,20 +505,26 @@ async function handleUserTurn(row) {
       await sleep(getTypingWaitTime());
       hideTypingIndicator();
 
+      // 入力の正解判定
       if (answer) {
         const validAnswers = answer.split("|");
         if (validAnswers.includes(userText)) {
+          // 正解
           if (TrueId) {
             speakerConversations[currentSpeakerId].currentId = parseInt(TrueId, 10);
             await displayFromId(parseInt(TrueId, 10));
           }
         } else {
+          // 不正解
           if (NGid) {
             speakerConversations[currentSpeakerId].currentId = parseInt(NGid, 10);
             await displayFromId(parseInt(NGid, 10));
           }
         }
       }
+
+      // 処理終了後に再度有効化
+      sendBtn.disabled = false;
     };
   }
 }
@@ -604,7 +623,7 @@ function getDelayForMessage(msg) {
   const perCharTime = 75;
   const length = msg.length;
   const base = length * perCharTime;
-  const factor = Math.random() * (1.6 - 1.0) + 1.0; 
+  const factor = Math.random() * (1.6 - 1.0) + 1.0;
   return Math.floor(base * factor);
 }
 
